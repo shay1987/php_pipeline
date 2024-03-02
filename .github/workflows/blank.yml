@@ -26,10 +26,31 @@ jobs:
         with:
           images: shay1987/php
       
+      - name: Retrieve existing Docker tags
+        id: get_existing_tags
+        run: |
+          existing_tags=$(curl -s "https://hub.docker.com/v2/repositories/${DOCKER_IMAGE}/tags" | jq -r '.results|.[]|.name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$')
+          if [[ -n $existing_tags ]]; then
+            latest_version=$(echo "$existing_tags" | sort -V | tail -n1)
+            IFS=. read -r major minor patch <<< "$latest_version"
+            patch=$((patch + 1))
+            new_version="${major}.${minor}.${patch}"
+          else
+            new_version="0.0.1"
+          fi
+          echo "::set-output name=new_version::$new_version"
+      - name: Set Docker image tag
+        id: set_image_tag
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            new_version="${{ steps.get_existing_tags.outputs.new_version }}"
+            echo "::set-output name=image_tag::${DOCKER_IMAGE}:latest"
+            echo "::set-output name=latest_tag::${DOCKER_IMAGE}:latest"
+          else
+            new_version="${{ steps.get_existing_tags.outputs.new_version }}"
+            echo "::set-output name=image_tag::${DOCKER_IMAGE}:${new_version}"
+          fi
       - name: Build and push Docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+        run: |
+          docker build -t "${{ steps.set_image_tag.outputs.image_tag }}" .
+          docker push "${{ steps.set_image_tag.outputs.image_tag }}"
