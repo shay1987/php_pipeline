@@ -11,7 +11,7 @@ spec:
         name: nginx-config  # ConfigMap name for Nginx configuration file
   containers:
     - name: php
-      image: php
+      image: shay1987/php
       imagePullPolicy: IfNotPresent
       imagePullPolicy: IfNotPresent
       volumeMounts:
